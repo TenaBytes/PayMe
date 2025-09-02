@@ -26,17 +26,39 @@ export default function LoginPage() {
     setError(null)
 
     try {
+      console.log("[v0] Login attempt for email:", email)
+
+      // Check hardcoded admin credentials first
       if (email === "nattyneck@gmail.com" && password === "BSU/MBBS/17/781$") {
+        console.log("[v0] Hardcoded admin login successful")
         router.push("/admin")
         return
       }
 
+      // Check localStorage for admin credentials
       const storedAdminCredentials = localStorage.getItem("adminCredentials")
+      console.log("[v0] Stored admin credentials:", storedAdminCredentials)
+
       if (storedAdminCredentials) {
-        const adminCreds = JSON.parse(storedAdminCredentials)
-        if (adminCreds.email === email && adminCreds.password === password && adminCreds.isAdmin) {
-          router.push("/admin")
-          return
+        try {
+          const adminCreds = JSON.parse(storedAdminCredentials)
+          console.log("[v0] Parsed admin credentials:", { email: adminCreds.email, isAdmin: adminCreds.isAdmin })
+
+          if (adminCreds.email === email && adminCreds.password === password && adminCreds.isAdmin) {
+            console.log("[v0] localStorage admin login successful")
+            localStorage.setItem(
+              "currentUser",
+              JSON.stringify({
+                email: adminCreds.email,
+                fullName: adminCreds.fullName,
+                isAdmin: true,
+              }),
+            )
+            router.push("/admin")
+            return
+          }
+        } catch (parseError) {
+          console.error("[v0] Error parsing admin credentials:", parseError)
         }
       }
 
