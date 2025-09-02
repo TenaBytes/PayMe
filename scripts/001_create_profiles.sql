@@ -6,6 +6,13 @@ create table if not exists public.profiles (
   avatar_url text,
   phone text,
   country text,
+  balance_usdt decimal(20,8) default 0.00000000,
+  balance_trx decimal(20,8) default 0.00000000,
+  referral_code text unique not null,
+  referred_by uuid references public.profiles(id),
+  referral_count integer default 0,
+  total_referral_earnings decimal(20,8) default 0.00000000,
+  last_wheel_spin date,
   kyc_status text default 'pending' check (kyc_status in ('pending', 'verified', 'rejected')),
   kyc_documents jsonb,
   is_admin boolean default false,
@@ -66,3 +73,30 @@ create trigger profiles_updated_at
   before update on public.profiles
   for each row
   execute function public.handle_updated_at();
+
+-- Added referral code generation function
+create or replace function generate_referral_code()
+returns text
+language plpgsql
+security definer
+as $$
+declare
+  code text;
+  exists_check boolean;
+begin
+  loop
+    -- Generate 8 character alphanumeric code
+    code := upper(substring(md5(random()::text) from 1 for 8));
+    
+    -- Check if code already exists
+    select exists(select 1 from public.profiles where referral_code = code) into exists_check;
+    
+    -- Exit loop if code is unique
+    if not exists_check then
+      exit;
+    end if;
+  end loop;
+  
+  return code;
+end;
+$$;

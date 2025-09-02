@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation"
 import { createClient } from "@/lib/supabase/server"
 import { DashboardLayout } from "@/components/dashboard/dashboard-layout"
-import { PortfolioOverview } from "@/components/dashboard/portfolio-overview"
-import { Testimonials } from "@/components/dashboard/testimonials" // replaced InvestmentPackages with Testimonials
-import { ActiveInvestments } from "@/components/dashboard/active-investments"
-import { RecentTransactions } from "@/components/dashboard/recent-transactions"
+import { CryptoOverview } from "@/components/dashboard/crypto-overview"
+import { QuickActions } from "@/components/dashboard/quick-actions"
+import { RecentActivity } from "@/components/dashboard/recent-activity"
+import { NewsSection } from "@/components/dashboard/news-section"
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -17,36 +17,37 @@ export default async function DashboardPage() {
     redirect("/auth/login")
   }
 
-  // Fetch user profile
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
-  // Fetch wallet balances
-  const { data: balances } = await supabase.from("wallet_balances").select("*").eq("user_id", user.id)
-
-  // Fetch active investments
-  const { data: investments } = await supabase
-    .from("investments")
-    .select(
-      `
-      *,
-      investment_packages (
-        name,
-        apy_rate,
-        duration_days
-      )
-    `,
-    )
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .order("created_at", { ascending: false })
-
-  // Fetch recent transactions
-  const { data: transactions } = await supabase
-    .from("transactions")
+  const { data: deposits } = await supabase
+    .from("deposits")
     .select("*")
     .eq("user_id", user.id)
     .order("created_at", { ascending: false })
-    .limit(10)
+    .limit(5)
+
+  const { data: withdrawals } = await supabase
+    .from("withdrawals")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(5)
+
+  const { data: news } = await supabase
+    .from("news")
+    .select("*")
+    .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(3)
+
+  const { data: todaySpin } = await supabase
+    .from("wheel_spins")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("spin_date", new Date().toISOString().split("T")[0])
+    .single()
+
+  const canSpinWheel = !todaySpin
 
   return (
     <DashboardLayout user={user} profile={profile}>
@@ -56,14 +57,15 @@ export default async function DashboardPage() {
           <p className="text-muted-foreground">Welcome back, {profile?.full_name || user.email}</p>
         </div>
 
-        <PortfolioOverview balances={balances || []} investments={investments || []} />
+        <CryptoOverview profile={profile} />
 
         <div className="grid lg:grid-cols-2 gap-8">
-          <Testimonials /> {/* replaced InvestmentPackages with Testimonials */}
-          <ActiveInvestments investments={investments || []} />
+          <QuickActions profile={profile} canSpinWheel={canSpinWheel} />
+
+          <RecentActivity deposits={deposits || []} withdrawals={withdrawals || []} />
         </div>
 
-        <RecentTransactions transactions={transactions || []} />
+        <NewsSection news={news || []} />
       </div>
     </DashboardLayout>
   )
