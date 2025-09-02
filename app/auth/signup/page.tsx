@@ -58,30 +58,17 @@ export default function SignUpPage() {
     }
 
     try {
-      if (isAdmin) {
-        // For admin accounts, we'll store the credentials locally and redirect
-        localStorage.setItem(
-          "adminCredentials",
-          JSON.stringify({
-            email: formData.email,
-            password: formData.password,
-            fullName: formData.fullName,
-            isAdmin: true,
-          }),
-        )
-        router.push("/admin")
-        return
-      }
-
-      // Regular user signup with Supabase
       const supabase = createClient()
       const { error } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
-          emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || `${window.location.origin}/dashboard`,
+          emailRedirectTo:
+            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ||
+            `${window.location.origin}${isAdmin ? "/admin" : "/dashboard"}`,
           data: {
             full_name: formData.fullName,
+            is_admin: isAdmin,
           },
         },
       })
