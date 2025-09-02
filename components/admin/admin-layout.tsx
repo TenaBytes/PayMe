@@ -29,12 +29,12 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
-import type { User as SupabaseUser } from "@supabase/supabase-js"
+// import { createClient } from "@/lib/supabase/client"
+// import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 interface AdminLayoutProps {
   children: React.ReactNode
-  user: SupabaseUser
+  user?: any
   profile?: any
 }
 
@@ -52,21 +52,43 @@ export function AdminLayout({ children, user, profile }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
-  const supabase = createClient()
+
+  const createSupabaseClient = () => {
+    try {
+      const { createClient } = require("@/lib/supabase/client")
+      return createClient()
+    } catch (error) {
+      console.log("[v0] Supabase not available, using fallback auth")
+      return null
+    }
+  }
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut()
+    const supabase = createSupabaseClient()
+
+    if (supabase) {
+      try {
+        await supabase.auth.signOut()
+      } catch (error) {
+        console.log("[v0] Supabase sign out failed, using fallback")
+      }
+    }
+
+    // Clear any local storage admin data
+    localStorage.removeItem("adminCredentials")
     router.push("/")
   }
 
   const getInitials = (name?: string) => {
-    if (!name) return user.email?.charAt(0).toUpperCase() || "A"
+    if (!name) return user?.email?.charAt(0).toUpperCase() || "A"
     return name
       .split(" ")
       .map((n) => n.charAt(0))
       .join("")
       .toUpperCase()
   }
+
+  const userEmail = user?.email || "admin@wealthnexus.com"
 
   const Sidebar = ({ mobile = false }: { mobile?: boolean }) => (
     <div className="flex h-full flex-col">
@@ -181,7 +203,7 @@ export function AdminLayout({ children, user, profile }: AdminLayoutProps) {
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none">{profile?.full_name || "Admin"}</p>
-                    <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                    <p className="text-xs leading-none text-muted-foreground">{userEmail}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />

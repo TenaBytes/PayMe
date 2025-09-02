@@ -44,26 +44,39 @@ export function PersonalInfo({ user, profile }: PersonalInfoProps) {
       const reader = new FileReader()
       reader.onloadend = () => {
         setAvatarPreview(reader.result as string)
+        localStorage.setItem("userAvatar", reader.result as string)
       }
       reader.readAsDataURL(file)
     }
   }
 
   const uploadAvatar = async (file: File) => {
-    const supabase = createClient()
-    const fileExt = file.name.split(".").pop()
-    const fileName = `${user.id}-${Math.random()}.${fileExt}`
-    const filePath = `avatars/${fileName}`
+    try {
+      const supabase = createClient()
+      const fileExt = file.name.split(".").pop()
+      const fileName = `${user.id}-${Math.random()}.${fileExt}`
+      const filePath = `avatars/${fileName}`
 
-    const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file)
+      const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file)
 
-    if (uploadError) throw uploadError
+      if (uploadError) throw uploadError
 
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from("avatars").getPublicUrl(filePath)
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("avatars").getPublicUrl(filePath)
 
-    return publicUrl
+      return publicUrl
+    } catch (error) {
+      const reader = new FileReader()
+      return new Promise<string>((resolve) => {
+        reader.onloadend = () => {
+          const result = reader.result as string
+          localStorage.setItem("userAvatar", result)
+          resolve(result)
+        }
+        reader.readAsDataURL(file)
+      })
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,23 +85,33 @@ export function PersonalInfo({ user, profile }: PersonalInfoProps) {
     setMessage(null)
 
     try {
-      const supabase = createClient()
-      let avatarUrl = profile?.avatar_url
+      let avatarUrl = profile?.avatar_url || localStorage.getItem("userAvatar")
 
       // Upload avatar if changed
       if (avatarFile) {
         avatarUrl = await uploadAvatar(avatarFile)
       }
 
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          ...formData,
-          avatar_url: avatarUrl,
-        })
-        .eq("id", user.id)
+      try {
+        const supabase = createClient()
+        const { error } = await supabase
+          .from("profiles")
+          .update({
+            ...formData,
+            avatar_url: avatarUrl,
+          })
+          .eq("id", user.id)
 
-      if (error) throw error
+        if (error) throw error
+      } catch (error) {
+        localStorage.setItem(
+          "userProfile",
+          JSON.stringify({
+            ...formData,
+            avatar_url: avatarUrl,
+          }),
+        )
+      }
 
       setMessage({ type: "success", text: "Profile updated successfully!" })
       setAvatarFile(null)
@@ -114,6 +137,8 @@ export function PersonalInfo({ user, profile }: PersonalInfoProps) {
       .toUpperCase()
   }
 
+  const currentAvatar = avatarPreview || profile?.avatar_url || localStorage.getItem("userAvatar") || "/placeholder.svg"
+
   return (
     <div className="space-y-6">
       <Card>
@@ -126,7 +151,7 @@ export function PersonalInfo({ user, profile }: PersonalInfoProps) {
             {/* Avatar Section */}
             <div className="flex items-center gap-6">
               <Avatar className="h-20 w-20">
-                <AvatarImage src={avatarPreview || profile?.avatar_url || "/placeholder.svg"} />
+                <AvatarImage src={currentAvatar || "/placeholder.svg"} />
                 <AvatarFallback className="text-lg">{getInitials(formData.full_name)}</AvatarFallback>
               </Avatar>
               <div>

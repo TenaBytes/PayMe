@@ -21,17 +21,15 @@ interface KycVerificationProps {
 export function KycVerification({ user, profile }: KycVerificationProps) {
   const [documents, setDocuments] = useState<{
     idFront: File | null
-    idBack: File | null
     selfie: File | null
   }>({
     idFront: null,
-    idBack: null,
     selfie: null,
   })
   const [isLoading, setIsLoading] = useState(false)
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
 
-  const handleFileChange = (type: "idFront" | "idBack" | "selfie") => (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (type: "idFront" | "selfie") => (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
       setDocuments((prev) => ({ ...prev, [type]: file }))
@@ -60,7 +58,7 @@ export function KycVerification({ user, profile }: KycVerificationProps) {
     setIsLoading(true)
     setMessage(null)
 
-    if (!documents.idFront || !documents.idBack || !documents.selfie) {
+    if (!documents.idFront || !documents.selfie) {
       setMessage({ type: "error", text: "Please upload all required documents" })
       setIsLoading(false)
       return
@@ -69,21 +67,17 @@ export function KycVerification({ user, profile }: KycVerificationProps) {
     try {
       const supabase = createClient()
 
-      // Upload documents
-      const [idFrontUrl, idBackUrl, selfieUrl] = await Promise.all([
+      const [idFrontUrl, selfieUrl] = await Promise.all([
         uploadDocument(documents.idFront, "id-front"),
-        uploadDocument(documents.idBack, "id-back"),
         uploadDocument(documents.selfie, "selfie"),
       ])
 
-      // Update profile with KYC documents
       const { error } = await supabase
         .from("profiles")
         .update({
           kyc_status: "pending",
           kyc_documents: {
             id_front: idFrontUrl,
-            id_back: idBackUrl,
             selfie: selfieUrl,
             submitted_at: new Date().toISOString(),
           },
@@ -92,7 +86,6 @@ export function KycVerification({ user, profile }: KycVerificationProps) {
 
       if (error) throw error
 
-      // Create notification
       await supabase.from("notifications").insert({
         user_id: user.id,
         title: "KYC Documents Submitted",
@@ -105,9 +98,8 @@ export function KycVerification({ user, profile }: KycVerificationProps) {
         type: "success",
         text: "KYC documents submitted successfully! We'll review them within 24-48 hours.",
       })
-      setDocuments({ idFront: null, idBack: null, selfie: null })
+      setDocuments({ idFront: null, selfie: null })
 
-      // Refresh the page to show updated status
       setTimeout(() => {
         window.location.reload()
       }, 2000)
@@ -195,53 +187,32 @@ export function KycVerification({ user, profile }: KycVerificationProps) {
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid gap-6 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="idFront">Government ID (Front)</Label>
-                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
-                    <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                    <Label htmlFor="idFront" className="cursor-pointer">
-                      <span className="text-sm text-muted-foreground">
-                        {documents.idFront ? documents.idFront.name : "Click to upload front of ID"}
-                      </span>
-                      <Input
-                        id="idFront"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileChange("idFront")}
-                        className="hidden"
-                      />
-                    </Label>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="idBack">Government ID (Back)</Label>
-                  <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
-                    <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                    <Label htmlFor="idBack" className="cursor-pointer">
-                      <span className="text-sm text-muted-foreground">
-                        {documents.idBack ? documents.idBack.name : "Click to upload back of ID"}
-                      </span>
-                      <Input
-                        id="idBack"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileChange("idBack")}
-                        className="hidden"
-                      />
-                    </Label>
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="idFront">Government ID (Front)</Label>
+                <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
+                  <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <Label htmlFor="idFront" className="cursor-pointer">
+                    <span className="text-sm text-muted-foreground">
+                      {documents.idFront ? documents.idFront.name : "Click to upload front of ID"}
+                    </span>
+                    <Input
+                      id="idFront"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleFileChange("idFront")}
+                      className="hidden"
+                    />
+                  </Label>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="selfie">Selfie with ID</Label>
+                <Label htmlFor="selfie">Selfie Photo</Label>
                 <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 text-center">
                   <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                   <Label htmlFor="selfie" className="cursor-pointer">
                     <span className="text-sm text-muted-foreground">
-                      {documents.selfie ? documents.selfie.name : "Click to upload selfie holding your ID"}
+                      {documents.selfie ? documents.selfie.name : "Click to upload your selfie"}
                     </span>
                     <Input
                       id="selfie"
@@ -253,7 +224,7 @@ export function KycVerification({ user, profile }: KycVerificationProps) {
                   </Label>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Take a clear photo of yourself holding your government ID next to your face
+                  Take a clear photo of yourself without holding any documents
                 </p>
               </div>
 
@@ -262,8 +233,8 @@ export function KycVerification({ user, profile }: KycVerificationProps) {
                 <ul className="text-sm text-muted-foreground space-y-1">
                   <li>• Government-issued photo ID (passport, driver's license, or national ID)</li>
                   <li>• Clear, high-quality images</li>
-                  <li>• All text and details must be clearly visible</li>
-                  <li>• Selfie must show your face and ID clearly</li>
+                  <li>• All text and details must be clearly visible on ID</li>
+                  <li>• Selfie must clearly show your face</li>
                 </ul>
               </div>
 
@@ -273,11 +244,7 @@ export function KycVerification({ user, profile }: KycVerificationProps) {
                 </Alert>
               )}
 
-              <Button
-                type="submit"
-                disabled={isLoading || !documents.idFront || !documents.idBack || !documents.selfie}
-                className="w-full"
-              >
+              <Button type="submit" disabled={isLoading || !documents.idFront || !documents.selfie} className="w-full">
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
